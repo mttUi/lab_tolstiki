@@ -1,65 +1,53 @@
-LABORATORNAYa RABOTA No4: TRI TOLSTYAKA
-Poisk optimalnyh koefficientov...
-Poisk koefficientov dlya razlichnyh stsenariev...
+ЛАБОРАТОРНАЯ РАБОТА №4: ТРИ ТОЛСТЯКА
+Поиск оптимальных коэффициентов...
+Поиск коэффициентов для различных сценариев...
 =============================================
 
-=== STsENARIY 1: Kuka uvolili ===
-Naideno: efficiency=1, gluttony=11
-Rezultat: dney=4, sedeno: 3300,3300,3300, ostalos: 0,0,0
-Naideno: efficiency=2, gluttony=12
-Rezultat: dney=4, sedeno: 3588,3600,3588, ostalos: 12,0,12
-Naideno: efficiency=3, gluttony=13
-Rezultat: dney=4, sedeno: 3887,3887,3900, ostalos: 13,13,0
-Naideno: efficiency=4, gluttony=14
-Rezultat: dney=4, sedeno: 4186,4200,4200, ostalos: 14,0,0
-Naideno: efficiency=5, gluttony=15
-Rezultat: dney=4, sedeno: 4485,4485,4500, ostalos: 15,15,0
+=== СЦЕНАРИЙ 1: Кука уволили ===
+Тест: eff=5, glut=100 - [Время: 2004 мс] не подходит (дни: 5, остаток: 1385)
+Тест: eff=10, glut=80 - [Время: 2011 мс] не подходит (дни: 5, остаток: 1890)
+Тест: eff=15, glut=120 - [Время: 2013 мс] не подходит (дни: 5, остаток: 1215)
 
-=== STsENARIY 2: Kuk ne poluchil zarplatu ===
+=== СЦЕНАРИЙ 2: Кук не получил зарплату ===
+Тест: eff=100, glut=50 - [Время: 2006 мс] не подходит (дни: 5, съедено: 800)
+Тест: eff=80, glut=60 - [Время: 2001 мс] не подходит (дни: 5, съедено: 1020)
+Тест: eff=120, glut=40 - [Время: 2001 мс] не подходит (дни: 5, съедено: 680)
 
-=== STsENARIY 3: Kuk uvolilsya sam ===
-Naideno: efficiency=3, gluttony=3
-Rezultat: dney=5, sedeno: 972,969,975, ostalos: 3003,3006,3000
-Naideno: efficiency=4, gluttony=3
-Rezultat: dney=5, sedeno: 975,981,984, ostalos: 3333,3327,3324
-Naideno: efficiency=5, gluttony=3
-Rezultat: dney=5, sedeno: 978,978,978, ostalos: 3652,3652,3652
-Naideno: efficiency=6, gluttony=3
-Rezultat: dney=5, sedeno: 975,978,978, ostalos: 3981,3978,3978
-Naideno: efficiency=7, gluttony=3
-Rezultat: dney=5, sedeno: 978,975,972, ostalos: 4304,4307,4310
-Naideno: efficiency=8, gluttony=3
-Rezultat: dney=5, sedeno: 969,972,966, ostalos: 4623,4620,4626
+=== СЦЕНАРИЙ 3: Кук уволился сам ===
+Тест: eff=20, glut=10 - [Время: 2005 мс] УСПЕХ! Прошло 5 дней, все нормально
+   Съедено: 170, 170, 170
+   Осталось: 3170, 3170, 3170
 
 
-DEMONSTRATsIYa STsENARIEV S NAIDENNYMI KOEFFITsIENTAMI
+ДЕМОНСТРАЦИЯ СЦЕНАРИЕВ
 =============================================
 
-=== Kuka uvolili ===
-Koefficienty: efficiency=2, gluttony=12
-Rezultaty:
-- Dney proshlo: 4
-- Sedeno tolstyakami: 3588, 3588, 3600
-- Ostalos v tarelkah: 12, 12, 0
-VYVOD: Kuka uvolili!
+СЦЕНАРИЙ 1: Кука уволили
+Ожидается: Тарелка пустая до 5 дней
+Коэффициенты: efficiency=10, gluttony=80
+[Время: 2010 мс] Фактические результаты:
+- Дней прошло: 5
+- Съедено толстяками: 1360, 1360, 1360
+- Осталось в тарелках: 1810, 1810, 1810
+? ВЫВОД: Кук уволился сам! (прошло 5 дней)
 -------------------
 
-=== Kuk ne poluchil zarplatu ===
-Koefficienty: efficiency=20, gluttony=18
-Rezultaty:
-- Dney proshlo: 5
-- Sedeno tolstyakami: 5832, 5886, 5886
-- Ostalos v tarelkah: 3708, 3654, 3654
-VYVOD: Kuk uvolilsya sam!
+СЦЕНАРИЙ 2: Кук не получил зарплату
+Ожидается: Все толстяки лопнули до 5 дней
+Коэффициенты: efficiency=100, gluttony=50
+[Время: 2004 мс] Фактические результаты:
+- Дней прошло: 5
+- Съедено толстяками: 850, 850, 850
+- Осталось в тарелках: 3850, 3850, 3850
+? ВЫВОД: Кук уволился сам! (прошло 5 дней)
 -------------------
 
-=== Kuk uvolilsya sam ===
-Koefficienty: efficiency=5, gluttony=5
-Rezultaty:
-- Dney proshlo: 5
-- Sedeno tolstyakami: 1625, 1620, 1620
-- Ostalos v tarelkah: 3000, 3005, 3005
-VYVOD: Kuk uvolilsya sam!
+СЦЕНАРИЙ 3: Кук уволился сам
+Ожидается: Прошло 5 дней, все в норме
+Коэффициенты: efficiency=25, gluttony=8
+[Время: 2004 мс] Фактические результаты:
+- Дней прошло: 5
+- Съедено толстяками: 128, 136, 136
+- Осталось в тарелках: 3297, 3289, 3289
+? ВЫВОД: Кук уволился сам! (прошло 5 дней)
 -------------------
-
-Programma zavershena.
