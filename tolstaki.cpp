@@ -1,298 +1,194 @@
-﻿#include <iostream>
+﻿#include <chrono>
 #include <thread>
 #include <mutex>
-#include <chrono>
 #include <vector>
-#include <locale>
+#include <iostream>
 #include <windows.h>
+#include <locale>
 
-using namespace std;
+using namespace std::chrono_literals;
 
-mutex mtx;
-bool cook_can_work = true;
-bool fatmen_can_eat = false;
-int ready_dishes = 0;
+std::mutex kitchen_lock;
+std::atomic<bool> chef_active{ true };
+std::atomic<bool> eaters_active{ false };
+std::atomic<int> servings_ready{ 0 };
 
-int dish1, dish2, dish3;
-int fatman1_eaten, fatman2_eaten, fatman3_eaten;
-int days_passed;
-bool simulation_running;
-int operations_count;
+int bowl_A, bowl_B, bowl_C;
+int eater_A_total, eater_B_total, eater_C_total;
+std::atomic<bool> simulation_active;
+std::atomic<bool> scenario_finished;
 
-void reset_simulation() {
-    dish1 = dish2 = dish3 = 3000;
-    fatman1_eaten = fatman2_eaten = fatman3_eaten = 0;
-    days_passed = 0;
-    simulation_running = true;
-    cook_can_work = true;
-    fatmen_can_eat = false;
-    ready_dishes = 0;
-    operations_count = 0;
+void initialize_scene() {
+    bowl_A = bowl_B = bowl_C = 3000;
+    eater_A_total = eater_B_total = eater_C_total = 0;
+    simulation_active = true;
+    scenario_finished = false;
+    chef_active = true;
+    eaters_active = false;
+    servings_ready = 0;
 }
 
-void cook(int efficiency_factor) {
-    while (simulation_running && days_passed < 5) {
-        // Ожидание разрешения на работу
-        while (!cook_can_work && simulation_running) {
-            this_thread::yield();
+void chef_routine(int productivity) {
+    while (simulation_active && !scenario_finished) {
+        while (!chef_active && simulation_active && !scenario_finished) {
+            std::this_thread::yield();
         }
 
-        if (!simulation_running) break;
+        if (!simulation_active || scenario_finished) return;
 
-        // Критическая секция - работа повара
-        mtx.lock();
+        std::lock_guard<std::mutex> guard(kitchen_lock);
 
-        dish1 += efficiency_factor;
-        dish2 += efficiency_factor;
-        dish3 += efficiency_factor;
+        bowl_A += productivity;
+        bowl_B += productivity;
+        bowl_C += productivity;
 
-        ready_dishes = 3;
-        cook_can_work = false;
-        fatmen_can_eat = true;
-
-        mtx.unlock();
-
-        this_thread::sleep_for(chrono::microseconds(100));
+        servings_ready = 3;
+        chef_active = false;
+        eaters_active = true;
     }
 }
 
-void fatman(int fatman_id, int gluttony) {
-    int& dish = (fatman_id == 1) ? dish1 : (fatman_id == 2) ? dish2 : dish3;
-    int& eaten = (fatman_id == 1) ? fatman1_eaten : (fatman_id == 2) ? fatman2_eaten : fatman3_eaten;
+void eater_routine(int eater_id, int appetite) {
+    int* target_bowl = nullptr;
+    int* consumption_record = nullptr;
 
-    while (simulation_running && eaten < 10000 && days_passed < 5) {
-        // Ожидание разрешения на еду
-        while (!fatmen_can_eat && simulation_running) {
-            this_thread::yield();
-        }
-
-        if (!simulation_running) break;
-
-        // Критическая секция - еда толстяка
-        mtx.lock();
-
-        // Обновляем дни на основе операций (каждые 10 операций = 1 день)
-        operations_count++;
-        if (operations_count >= 10) {
-            days_passed++;
-            operations_count = 0;
-        }
-
-        if (ready_dishes > 0 && dish >= gluttony) {
-            dish -= gluttony;
-            eaten += gluttony;
-            ready_dishes--;
-
-            // Если все тарелки обработаны, передаем ход повару
-            if (ready_dishes == 0) {
-                fatmen_can_eat = false;
-                cook_can_work = true;
-            }
-
-            // Проверка условий завершения
-            if (dish <= 0 || eaten >= 10000) {
-                simulation_running = false;
-            }
-        }
-
-        mtx.unlock();
-
-        this_thread::sleep_for(chrono::microseconds(100));
+    if (eater_id == 1) {
+        target_bowl = &bowl_A;
+        consumption_record = &eater_A_total;
     }
-}
-
-bool run_simulation(int efficiency_factor, int gluttony, int& result_days,
-    int& result_eaten1, int& result_eaten2, int& result_eaten3,
-    int& result_dish1, int& result_dish2, int& result_dish3) {
-    reset_simulation();
-
-    thread cook_thread(cook, efficiency_factor);
-    thread fatman1(fatman, 1, gluttony);
-    thread fatman2(fatman, 2, gluttony);
-    thread fatman3(fatman, 3, gluttony);
-
-    // Ждем завершения симуляции
-    auto start_time = chrono::steady_clock::now();
-    while (simulation_running) {
-        auto current_time = chrono::steady_clock::now();
-        auto elapsed = chrono::duration_cast<chrono::milliseconds>(current_time - start_time);
-
-        if (elapsed.count() > 2000) { // 2 секунды максимум
-            simulation_running = false;
-            break;
-        }
-        this_thread::sleep_for(chrono::milliseconds(10));
+    else if (eater_id == 2) {
+        target_bowl = &bowl_B;
+        consumption_record = &eater_B_total;
+    }
+    else {
+        target_bowl = &bowl_C;
+        consumption_record = &eater_C_total;
     }
 
-    cook_thread.join();
-    fatman1.join();
-    fatman2.join();
-    fatman3.join();
-
-    auto end_time = chrono::steady_clock::now();
-    auto total_time = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
-
-    result_days = days_passed;
-    result_eaten1 = fatman1_eaten;
-    result_eaten2 = fatman2_eaten;
-    result_eaten3 = fatman3_eaten;
-    result_dish1 = dish1;
-    result_dish2 = dish2;
-    result_dish3 = dish3;
-
-    cout << "[Время: " << total_time.count() << " мс] ";
-
-    bool all_burst = (fatman1_eaten >= 10000) && (fatman2_eaten >= 10000) && (fatman3_eaten >= 10000);
-    bool any_empty = (dish1 <= 0) || (dish2 <= 0) || (dish3 <= 0);
-    bool time_out = (days_passed >= 5);
-
-    return (any_empty || all_burst || time_out);
-}
-
-void find_scenarios() {
-    cout << "Поиск коэффициентов для различных сценариев..." << endl;
-    cout << "=============================================" << endl;
-
-    cout << "\n=== СЦЕНАРИЙ 1: Кука уволили ===" << endl;
-    // Маленькая эффективность, большое обжорство - тарелки пустеют быстро
-    vector<pair<int, int>> tests = { {5, 100}, {10, 80}, {15, 120} };
-
-    for (const auto& test : tests) {
-        int eff = test.first;
-        int glut = test.second;
-        int days, eaten1, eaten2, eaten3, d1, d2, d3;
-
-        cout << "Тест: eff=" << eff << ", glut=" << glut << " - ";
-        if (run_simulation(eff, glut, days, eaten1, eaten2, eaten3, d1, d2, d3)) {
-            bool empty_plate = (d1 <= 0) || (d2 <= 0) || (d3 <= 0);
-            if (empty_plate && days < 5) {
-                cout << "УСПЕХ! Тарелка пустая за " << days << " дней" << endl;
-                cout << "   Съедено: " << eaten1 << ", " << eaten2 << ", " << eaten3 << endl;
-                cout << "   Осталось: " << d1 << ", " << d2 << ", " << d3 << endl;
-                break;
-            }
-            else {
-                cout << "не подходит (дни: " << days << ", остаток: " << d1 << ")" << endl;
-            }
+    while (simulation_active && !scenario_finished) {
+        while (!eaters_active && simulation_active && !scenario_finished) {
+            std::this_thread::yield();
         }
-    }
 
-    cout << "\n=== СЦЕНАРИЙ 2: Кук не получил зарплату ===" << endl;
-    // Большая эффективность, среднее обжорство - толстяки быстро наедают 10000
-    tests = { {100, 50}, {80, 60}, {120, 40} };
+        if (!simulation_active || scenario_finished) return;
 
-    for (const auto& test : tests) {
-        int eff = test.first;
-        int glut = test.second;
-        int days, eaten1, eaten2, eaten3, d1, d2, d3;
+        {
+            std::lock_guard<std::mutex> guard(kitchen_lock);
 
-        cout << "Тест: eff=" << eff << ", glut=" << glut << " - ";
-        if (run_simulation(eff, glut, days, eaten1, eaten2, eaten3, d1, d2, d3)) {
-            bool all_burst = (eaten1 >= 10000) && (eaten2 >= 10000) && (eaten3 >= 10000);
-            if (all_burst && days < 5) {
-                cout << "УСПЕХ! Все лопнули за " << days << " дней" << endl;
-                cout << "   Съедено: " << eaten1 << ", " << eaten2 << ", " << eaten3 << endl;
-                break;
+            bool empty_bowl_exists = (bowl_A <= 0) || (bowl_B <= 0) || (bowl_C <= 0);
+            bool all_overfull = (eater_A_total >= 10000) && (eater_B_total >= 10000) && (eater_C_total >= 10000);
+
+            if (empty_bowl_exists || all_overfull) {
+                scenario_finished = true;
+                return;
             }
-            else {
-                cout << "не подходит (дни: " << days << ", съедено: " << eaten1 << ")" << endl;
-            }
-        }
-    }
 
-    cout << "\n=== СЦЕНАРИЙ 3: Кук уволился сам ===" << endl;
-    // Сбалансированные значения - успевают за 5 дней
-    tests = { {20, 10}, {25, 8}, {30, 12} };
+            if (servings_ready > 0 && *target_bowl >= appetite) {
+                *target_bowl -= appetite;
+                *consumption_record += appetite;
+                servings_ready--;
 
-    for (const auto& test : tests) {
-        int eff = test.first;
-        int glut = test.second;
-        int days, eaten1, eaten2, eaten3, d1, d2, d3;
-
-        cout << "Тест: eff=" << eff << ", glut=" << glut << " - ";
-        if (run_simulation(eff, glut, days, eaten1, eaten2, eaten3, d1, d2, d3)) {
-            bool time_out = (days >= 5);
-            bool plates_ok = (d1 > 0) && (d2 > 0) && (d3 > 0);
-            bool not_burst = (eaten1 < 10000) && (eaten2 < 10000) && (eaten3 < 10000);
-
-            if (time_out && plates_ok && not_burst) {
-                cout << "УСПЕХ! Прошло 5 дней, все нормально" << endl;
-                cout << "   Съедено: " << eaten1 << ", " << eaten2 << ", " << eaten3 << endl;
-                cout << "   Осталось: " << d1 << ", " << d2 << ", " << d3 << endl;
-                break;
-            }
-            else {
-                cout << "не подходит (дни: " << days << ", съедено: " << eaten1 << ")" << endl;
+                if (servings_ready == 0) {
+                    eaters_active = false;
+                    chef_active = true;
+                }
             }
         }
     }
 }
 
-void demonstrate_scenarios() {
-    cout << "\n\nДЕМОНСТРАЦИЯ СЦЕНАРИЕВ" << endl;
-    cout << "=============================================" << endl;
+void execute_scenario(int chef_productivity, int eater_appetite,
+    const std::string& title, int expected_outcome) {
+    initialize_scene();
 
-    struct Scenario {
-        int eff;
-        int glut;
-        string description;
-        string expected;
-    };
+    std::cout << "\n■■■■ " << title << " ■■■■" << std::endl;
+    std::cout << "Параметры: продуктивность=" << chef_productivity
+        << ", аппетит=" << eater_appetite << std::endl;
 
-    vector<Scenario> scenarios = {
-        {10, 80, "СЦЕНАРИЙ 1: Кука уволили", "Тарелка пустая до 5 дней"},
-        {100, 50, "СЦЕНАРИЙ 2: Кук не получил зарплату", "Все толстяки лопнули до 5 дней"},
-        {25, 8, "СЦЕНАРИЙ 3: Кук уволился сам", "Прошло 5 дней, все в норме"}
-    };
+    std::thread chef(chef_routine, chef_productivity);
+    std::thread eater1(eater_routine, 1, eater_appetite);
+    std::thread eater2(eater_routine, 2, eater_appetite);
+    std::thread eater3(eater_routine, 3, eater_appetite);
 
-    for (const auto& scenario : scenarios) {
-        int eff = scenario.eff;
-        int glut = scenario.glut;
-        string description = scenario.description;
-        string expected = scenario.expected;
+    auto scenario_start = std::chrono::steady_clock::now();
+    int elapsed = 0;
 
-        cout << "\n" << description << endl;
-        cout << "Ожидается: " << expected << endl;
-        cout << "Коэффициенты: efficiency=" << eff << ", gluttony=" << glut << endl;
+    while (simulation_active && !scenario_finished && elapsed < 5) {
+        auto current_time = std::chrono::steady_clock::now();
+        elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+            current_time - scenario_start).count();
+        std::this_thread::sleep_for(10ms);
+    }
 
-        int days, eaten1, eaten2, eaten3, d1, d2, d3;
-        run_simulation(eff, glut, days, eaten1, eaten2, eaten3, d1, d2, d3);
+    simulation_active = false;
+    scenario_finished = true;
 
-        cout << "Фактические результаты:" << endl;
-        cout << "- Дней прошло: " << days << endl;
-        cout << "- Съедено толстяками: " << eaten1 << ", " << eaten2 << ", " << eaten3 << endl;
-        cout << "- Осталось в тарелках: " << d1 << ", " << d2 << ", " << d3 << endl;
+    chef.join();
+    eater1.join();
+    eater2.join();
+    eater3.join();
 
-        // Анализ результата
-        if (d1 <= 0 || d2 <= 0 || d3 <= 0) {
-            cout << "✓ ВЫВОД: Кука уволили! (тарелка пустая)" << endl;
-        }
-        else if (eaten1 >= 10000 && eaten2 >= 10000 && eaten3 >= 10000) {
-            cout << "✓ ВЫВОД: Кук не получил зарплату! (все толстяки лопнули)" << endl;
-        }
-        else if (days >= 5) {
-            cout << "✓ ВЫВОД: Кук уволился сам! (прошло 5 дней)" << endl;
-        }
-        else {
-            cout << "? ВЫВОД: Неопределенный результат" << endl;
-        }
-        cout << "-------------------" << endl;
+    auto scenario_end = std::chrono::steady_clock::now();
+    auto time_taken = std::chrono::duration_cast<std::chrono::seconds>(
+        scenario_end - scenario_start);
+
+    std::cout << "Итоги через " << time_taken.count() << " секунд:" << std::endl;
+    std::cout << "• Потреблено едоками: " << eater_A_total << ", "
+        << eater_B_total << ", " << eater_C_total << std::endl;
+    std::cout << "• Остаток в мисках: " << bowl_A << ", "
+        << bowl_B << ", " << bowl_C << std::endl;
+
+    bool empty_bowl = (bowl_A <= 0) || (bowl_B <= 0) || (bowl_C <= 0);
+    bool all_full = (eater_A_total >= 10000) && (eater_B_total >= 10000) && (eater_C_total >= 10000);
+    bool timeout_reached = (time_taken.count() >= 5);
+
+    bool scenario_success = false;
+
+    if (expected_outcome == 1) {
+        scenario_success = empty_bowl && !timeout_reached;
+        std::cout << "РЕЗУЛЬТАТ: "
+            << (scenario_success ? "✅ Шефа уволили! (миска опустела до 5 дней)"
+                : "❌ Цель не достигнута") << std::endl;
+    }
+    else if (expected_outcome == 2) {
+        scenario_success = all_full && !timeout_reached;
+        std::cout << "РЕЗУЛЬТАТ: "
+            << (scenario_success ? "✅ Шеф без зарплаты! (все наелись до 5 дней)"
+                : "❌ Цель не достигнута") << std::endl;
+    }
+    else if (expected_outcome == 3) {
+        scenario_success = timeout_reached && !empty_bowl && !all_full;
+        std::cout << "РЕЗУЛЬТАТ: "
+            << (scenario_success ? "✅ Шеф ушел сам! (5 дней прошло, всё стабильно)"
+                : "❌ Цель не достигнута") << std::endl;
+    }
+
+    if (!scenario_success) {
+        std::cout << "   (Причины: ";
+        if (timeout_reached) std::cout << "время истекло, ";
+        if (empty_bowl) std::cout << "миска пуста, ";
+        if (all_full) std::cout << "все насытились";
+        std::cout << ")" << std::endl;
     }
 }
 
 int main() {
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
-    setlocale(LC_ALL, "Russian");
+    std::locale::global(std::locale("Russian"));
 
-    cout << "ЛАБОРАТОРНАЯ РАБОТА №4: ТРИ ТОЛСТЯКА" << endl;
-    cout << "Поиск оптимальных коэффициентов..." << endl;
+    std::cout << "ЛАБОРАТОРНАЯ РАБОТА №4: ТРИ ОБЖОРЫ" << std::endl;
+    std::cout << "Демонстрация различных ситуаций..." << std::endl;
 
-    find_scenarios();
+    // Ситуация 1: Шефа увольняют - миска быстро пустеет
+    execute_scenario(5, 150, "СИТУАЦИЯ 1: Увольнение шефа", 1);
 
-    demonstrate_scenarios();
+    // Ситуация 2: Шеф без оплаты - все быстро наедаются
+    execute_scenario(300, 250, "СИТУАЦИЯ 2: Без оплаты труда", 2);
 
-    cout << "\nПрограмма завершена." << endl;
-    system("pause");
+    // Ситуация 3: Шеф уходит сам - всё сбалансировано
+    execute_scenario(20, 15, "СИТУАЦИЯ 3: Добровольный уход", 3);
+
+    std::cout << "\nЗавершение программы." << std::endl;
     return 0;
 }
